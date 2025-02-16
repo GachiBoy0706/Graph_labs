@@ -207,15 +207,18 @@ HRESULT InitDevice(HWND hWnd) {
 }
 
 void CleanupDevice() {
-    if (m_pDeviceContext)
+    if (m_pDeviceContext) {
         m_pDeviceContext->ClearState();
-    if (g_pRenderTargetView)
+        m_pDeviceContext->Release();
+    }
+    if (g_pRenderTargetView) 
         g_pRenderTargetView->Release();
-    if (g_pSwapChain)
+    if (g_pSwapChain) 
         g_pSwapChain->Release();
-    if (g_pd3dDevice)
+    if (g_pd3dDevice) 
         g_pd3dDevice->Release();
 }
+
 
 void Render() {
     // Clear background buffer
