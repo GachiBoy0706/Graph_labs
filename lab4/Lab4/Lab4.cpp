@@ -4,6 +4,8 @@
 #include <dxgi.h>
 #include <d3d11.h>
 #include <string>
+#include <windowsx.h>
+
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -11,43 +13,49 @@
 #define MAX_LOADSTRING 100
 
 // Глобальные переменные
-WCHAR szTitle[MAX_LOADSTRING] = L"Special Lab4 Sazhin Daniil";
-WCHAR szWindowClass[MAX_LOADSTRING] = L"AdvancedLab4Class";
+WCHAR windowTitle[MAX_LOADSTRING] = L"Special Lab4 Sazhin Daniil";
+WCHAR windowClassName[MAX_LOADSTRING] = L"AdvancedLab4Class";
 
-RenderClass* g_Render = nullptr; 
+RenderClass* g_Render = nullptr;
 
-ATOM RegisterWindowClass(HINSTANCE hInstance);
-BOOL InitializeApplication(HINSTANCE hInstance, int nCmdShow);
-LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-void HandleWindowResize(HWND hWnd);
+// Переменные для отслеживания мыши
+int mouseX = 0;
+int mouseY = 0;
+bool mouseLeftButtonPressed = false;
+bool mouseRightButtonPressed = false;
 
-int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
-    _In_opt_ HINSTANCE hPrevInstance,
-    _In_ LPWSTR lpCmdLine,
-    _In_ int nCmdShow)
+ATOM RegisterWindowClass(HINSTANCE instanceHandle);
+BOOL InitializeApplication(HINSTANCE instanceHandle, int showCommand);
+LRESULT CALLBACK WindowProc(HWND windowHandle, UINT message, WPARAM wParam, LPARAM lParam);
+void HandleWindowResize(HWND windowHandle);
+
+int APIENTRY wWinMain(_In_ HINSTANCE instanceHandle,
+    _In_opt_ HINSTANCE previousInstanceHandle,
+    _In_ LPWSTR commandLine,
+    _In_ int showCommand)
 {
-    UNREFERENCED_PARAMETER(hPrevInstance);
-    UNREFERENCED_PARAMETER(lpCmdLine);
+    UNREFERENCED_PARAMETER(previousInstanceHandle);
+    UNREFERENCED_PARAMETER(commandLine);
 
-    if (!RegisterWindowClass(hInstance))
+    if (!RegisterWindowClass(instanceHandle))
     {
         OutputDebugString(_T("Не удалось зарегистрировать класс окна\n"));
         return FALSE;
     }
 
-    if (!InitializeApplication(hInstance, nCmdShow))
+    if (!InitializeApplication(instanceHandle, showCommand))
     {
         OutputDebugString(_T("Не удалось инициализировать приложение\n"));
         return FALSE;
     }
 
-    MSG msg = {};
-    while (msg.message != WM_QUIT)
+    MSG message = {};
+    while (message.message != WM_QUIT)
     {
-        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+        if (PeekMessage(&message, nullptr, 0, 0, PM_REMOVE))
         {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            TranslateMessage(&message);
+            DispatchMessage(&message);
         }
         else
         {
@@ -63,37 +71,37 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         g_Render = nullptr;
     }
 
-    return (int)msg.wParam;
+    return (int)message.wParam;
 }
 
-ATOM RegisterWindowClass(HINSTANCE hInstance)
+ATOM RegisterWindowClass(HINSTANCE instanceHandle)
 {
-    WNDCLASSEXW wcex = {};
-    wcex.cbSize = sizeof(WNDCLASSEX);
-    wcex.style = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc = WindowProc;
-    wcex.hInstance = hInstance;
-    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wcex.lpszClassName = szWindowClass;
-    wcex.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_SMALL));
+    WNDCLASSEXW windowClass = {};
+    windowClass.cbSize = sizeof(WNDCLASSEX);
+    windowClass.style = CS_HREDRAW | CS_VREDRAW;
+    windowClass.lpfnWndProc = WindowProc;
+    windowClass.hInstance = instanceHandle;
+    windowClass.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    windowClass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    windowClass.lpszClassName = windowClassName;
+    windowClass.hIconSm = LoadIcon(instanceHandle, MAKEINTRESOURCE(IDI_SMALL));
 
-    return RegisterClassExW(&wcex);
+    return RegisterClassExW(&windowClass);
 }
 
-BOOL InitializeApplication(HINSTANCE hInstance, int nCmdShow)
+BOOL InitializeApplication(HINSTANCE instanceHandle, int showCommand)
 {
-    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+    HWND windowHandle = CreateWindowW(windowClassName, windowTitle, WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, 0, CW_USEDEFAULT, 0,
-        nullptr, nullptr, hInstance, nullptr);
-    if (!hWnd)
+        nullptr, nullptr, instanceHandle, nullptr);
+    if (!windowHandle)
     {
         OutputDebugString(_T("Не удалось создать окно\n"));
         return FALSE;
     }
 
     g_Render = new RenderClass();
-    if (FAILED(g_Render->Init(hWnd, szTitle, szWindowClass)))
+    if (FAILED(g_Render->Init(windowHandle, windowTitle, windowClassName)))
     {
         OutputDebugString(_T("Не удалось инициализировать рендерер\n"));
         delete g_Render;
@@ -101,59 +109,60 @@ BOOL InitializeApplication(HINSTANCE hInstance, int nCmdShow)
         return FALSE;
     }
 
-    ShowWindow(hWnd, nCmdShow);
-    UpdateWindow(hWnd);
+    ShowWindow(windowHandle, showCommand);
+    UpdateWindow(windowHandle);
 
     return TRUE;
 }
 
-LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK WindowProc(HWND windowHandle, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
     case WM_SIZE:
-        HandleWindowResize(hWnd);
+        HandleWindowResize(windowHandle);
         break;
 
-    case WM_KEYDOWN:
-        if (g_Render)
+    case WM_MOUSEMOVE:
+        if (mouseLeftButtonPressed || mouseRightButtonPressed)
         {
-            switch (wParam)
+            int newX = GET_X_LPARAM(lParam);
+            int newY = GET_Y_LPARAM(lParam);
+
+            if (mouseLeftButtonPressed)
             {
-            case 'W': // Вращение вверх
-                g_Render->RotateCamera(0.0f, 0.01f);
-                break;
-            case 'S': // Вращение вниз
-                g_Render->RotateCamera(0.0f, -0.01f);
-                break;
-            case 'A': // Вращение влево
-                g_Render->RotateCamera(-0.01f, 0.0f);
-                break;
-            case 'D': // Вращение вправо
-                g_Render->RotateCamera(0.01f, 0.0f);
-                break;
-            case VK_UP:
-                g_Render->MoveCamera(0.0f, 1.0f, 0.0f);
-                break;
-            case VK_DOWN:
-                g_Render->MoveCamera(0.0f, -1.0f, 0.0f);
-                break;
-            case VK_LEFT:
-                g_Render->MoveCamera(-1.0f, 0.0f, 0.0f);
-                break;
-            case VK_RIGHT:
-                g_Render->MoveCamera(1.0f, 0.0f, 0.0f);
-                break;
-            case VK_ADD:
-            case 0xBB:
-                g_Render->MoveCamera(0.0f, 0.0f, 1.0f);
-                break;
-            case VK_SUBTRACT:
-            case 0xBD:
-                g_Render->MoveCamera(0.0f, 0.0f, -1.0f);
-                break;
+                // Вращение камеры при движении мыши с левой кнопкой
+                g_Render->RotateCamera((newX - mouseX) * 0.01f, (newY - mouseY) * 0.01f);
             }
+            else if (mouseRightButtonPressed)
+            {
+                // Движение камеры при движении мыши с правой кнопкой
+                g_Render->MoveCamera((newX - mouseX) * 0.01f, -(newY - mouseY) * 0.01f, 0.0f);
+            }
+
+            mouseX = newX;
+            mouseY = newY;
         }
+        break;
+
+    case WM_LBUTTONDOWN:
+        mouseLeftButtonPressed = true;
+        mouseX = GET_X_LPARAM(lParam);
+        mouseY = GET_Y_LPARAM(lParam);
+        break;
+
+    case WM_RBUTTONDOWN:
+        mouseRightButtonPressed = true;
+        mouseX = GET_X_LPARAM(lParam);
+        mouseY = GET_Y_LPARAM(lParam);
+        break;
+
+    case WM_LBUTTONUP:
+        mouseLeftButtonPressed = false;
+        break;
+
+    case WM_RBUTTONUP:
+        mouseRightButtonPressed = false;
         break;
 
     case WM_DESTROY:
@@ -161,15 +170,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         break;
 
     default:
-        return DefWindowProc(hWnd, message, wParam, lParam);
+        return DefWindowProc(windowHandle, message, wParam, lParam);
     }
     return 0;
 }
 
-void HandleWindowResize(HWND hWnd)
+void HandleWindowResize(HWND windowHandle)
 {
     if (g_Render)
-        g_Render->Resize(hWnd);
+        g_Render->Resize(windowHandle);
 }
-
-
